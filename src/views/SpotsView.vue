@@ -50,7 +50,7 @@
           >
             <div class="color-white">{{ spot.name }}</div>
             <div>
-              Total: {{ spot.total_lots }} / 車: {{ spot.n_currenet_lots }} / 空:
+              總數: {{ spot.total_lots }} / 剩餘車輛: {{ spot.n_currenet_lots }} / 剩餘車位:
               {{ spot.n_empty_lots }}
             </div>
           </div>
