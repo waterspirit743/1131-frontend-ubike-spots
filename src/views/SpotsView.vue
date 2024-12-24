@@ -38,20 +38,19 @@
     <aside
       class="spots-list-drawer w-30% min-w-23.5rem pr-2rem p-l0.5rem py-2rem flex flex-col gap-0.5rem bg-blue/20"
     >
-      <div class="search flex flex-row items-center gap-1rem justify-end">
+      <div class="search flex flex-row items-center gap-1rem justify-center">
+        <span class="bg-transparent py-0.25rem"> Search </span>
         <input
           type="text"
+          v-model="searchText"
           class="w-1/2 min-w-15rem rounded-0.5rem outline-none bg-blue/25 p-0.25rem text-white/90"
         />
-        <button class="bg-transparent b-1 b-white rounded-[0.5rem] py-0.25rem px-0.75rem">
-          Search
-        </button>
       </div>
 
       <OverlayScrollbarsComponent defer>
-        <div class="flex flex-col gap-0.25rem">
+        <div class="flex flex-col gap-0.25rem relative">
           <SpotListItem
-            v-for="spot in spots"
+            v-for="spot in filteredSpots"
             :key="spot.name"
             :spot="spot"
             :selected="spot === selectedSpot"
@@ -69,7 +68,7 @@ import { fetchUbike, type Spot } from '@/lib/apis'
 import { LMap, LTileLayer, LMarker } from '@vue-leaflet/vue-leaflet'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-vue'
 import SpotListItem from '@/components/SpotListItem.vue'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Icon } from 'leaflet'
 
 const zoom = ref(11)
@@ -94,14 +93,43 @@ function handleSelectSpot(spot?: Spot) {
   selectedSpot.value = spot
 }
 
+const preloadSpotSearchText = '臺灣大道七段200號(南側人行道)'
+
 async function updateSpots() {
   spots.value = await fetchUbike()
-  handleSelectSpot(spots.value[0])
+
+  const preloadSpot = searchSpot(preloadSpotSearchText)
+  handleSelectSpot(preloadSpot?.[0] ?? spots.value[0])
 }
 
 onMounted(async () => {
   await updateSpots()
 })
+
+/* search */
+const searchText = ref('')
+
+function searchSpot(searchText: string): Spot[] | undefined {
+  return spots.value?.filter((value) => filterSpot(value, searchText))
+}
+
+const filteredSpots = computed<Spot[] | undefined>(() => searchSpot(searchText.value)) // re-evaluate
+
+const wordDictionary = {
+  台: '臺',
+}
+
+function convertAliasWords(text: string): string {
+  for (const [key, value] of Object.entries(wordDictionary)) {
+    text = text.replace(key, value)
+  }
+  return text
+}
+
+function filterSpot(spot: Spot, searchText: string) {
+  // return true to retain spot, otherwise to filter out spot
+  return convertAliasWords(spot.name).includes(convertAliasWords(searchText))
+}
 </script>
 
 <style scoped>
