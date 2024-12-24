@@ -17,21 +17,28 @@
             <div class="font-size-12rem animate-spin rounded-50% -transform-translate-50%">☯</div>
           </div>
         </Transition>
-        <l-map v-model:zoom="zoom" :center="[23.5, 120.0]">
+
+        <!-- prettier-ignore-attribute :center -->
+        <l-map v-model:zoom="zoom" :center="(center as any)">
           <l-tile-layer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             layer-type="base"
             name="OpenStreetMap"
           />
 
-          <l-marker v-for="spot in spots" :key="spot.name" :lat-lng="spot.location" />
+          <l-marker
+            v-for="spot in spots"
+            :key="spot.name"
+            :lat-lng="spot.location"
+            :icon="selectedSpot === spot ? icon : defaultIcon"
+          />
         </l-map>
       </div>
     </div>
     <aside
-      class="spots-list-drawer w-30% pr-2rem p-l0.5rem py-2rem flex flex-col gap-0.5rem bg-blue/20"
+      class="spots-list-drawer w-30% min-w-23.5rem pr-2rem p-l0.5rem py-2rem flex flex-col gap-0.5rem bg-blue/20"
     >
-      <div class="search grow flex flex-row items-center gap-1rem justify-end">
+      <div class="search flex flex-row items-center gap-1rem justify-end">
         <input
           type="text"
           class="w-1/2 min-w-15rem rounded-0.5rem outline-none bg-blue/25 p-0.25rem text-white/90"
@@ -43,17 +50,14 @@
 
       <OverlayScrollbarsComponent defer>
         <div class="flex flex-col gap-0.25rem">
-          <div
+          <SpotListItem
             v-for="spot in spots"
             :key="spot.name"
-            class="b-1 b-amber rounded-0.25rem flex flex-col gap0.25rem p-0.25rem"
+            :spot="spot"
+            :selected="spot === selectedSpot"
+            @click="handleSelectSpot(spot)"
           >
-            <div class="color-white">{{ spot.name }}</div>
-            <div>
-              總數: {{ spot.total_lots }} / 剩餘車輛: {{ spot.n_currenet_lots }} / 剩餘車位:
-              {{ spot.n_empty_lots }}
-            </div>
-          </div>
+          </SpotListItem>
         </div>
       </OverlayScrollbarsComponent>
     </aside>
@@ -61,71 +65,47 @@
 </template>
 
 <script setup lang="ts">
+import { fetchUbike, type Spot } from '@/lib/apis'
 import { LMap, LTileLayer, LMarker } from '@vue-leaflet/vue-leaflet'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-vue'
+import SpotListItem from '@/components/SpotListItem.vue'
 import { onMounted, ref } from 'vue'
+import { Icon } from 'leaflet'
 
 const zoom = ref(11)
 
+const center = ref({ lat: 23.5, lng: 120.0 })
+
+const selectedSpot = ref<Spot>()
+
 const spots = ref<Spot[]>()
 
-async function fetchUbike(): Promise<Spot[]> {
-  const response = await fetch(
-    'https://datacenter.taichung.gov.tw/swagger/OpenData/86dfad5c-540c-4479-bb7d-d7439d34eeb1',
-  )
-  const json: ResponseData = await response.json()
-  if (json.retCode !== 1) {
-    alert("Can't get data")
-    return []
+const icon = new Icon.Default({ className: 'select-spot-marker' }) as Icon
+const defaultIcon = new Icon.Default() as Icon
+
+function handleSelectSpot(spot?: Spot) {
+  if (spot == null) {
+    selectedSpot.value = undefined
+    return
   }
-  return json.retVal.map(parseSpot)
+
+  center.value = spot.location
+  zoom.value = 20
+  selectedSpot.value = spot
 }
 
 async function updateSpots() {
   spots.value = await fetchUbike()
+  handleSelectSpot(spots.value[0])
 }
 
 onMounted(async () => {
   await updateSpots()
 })
-
-type Location = {
-  lat: number
-  lng: number
-}
-
-type Spot = {
-  name: string
-  location: Location
-  total_lots: number
-  n_empty_lots: number
-  n_currenet_lots: number
-}
-
-type RawSpot = {
-  ar: string // name
-  lat: string
-  lng: string
-  tot: string // total_lots
-  sbi: string // n_current_lots
-  bemp: string // n_empty_lots
-}
-
-type ResponseData = {
-  retCode: number
-  retVal: RawSpot[]
-}
-
-function parseSpot(rawSpot: RawSpot): Spot {
-  return {
-    name: rawSpot.ar,
-    location: {
-      lat: parseFloat(rawSpot.lat),
-      lng: parseFloat(rawSpot.lng),
-    },
-    total_lots: parseInt(rawSpot.tot),
-    n_currenet_lots: parseInt(rawSpot.sbi),
-    n_empty_lots: parseInt(rawSpot.bemp),
-  }
-}
 </script>
+
+<style scoped>
+:deep(.select-spot-marker) {
+  filter: hue-rotate(90deg);
+}
+</style>
